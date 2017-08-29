@@ -3,16 +3,15 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "pulp browserify --to dist/index.js",
+    "images": "mkdir -p dist/images && bash -c 'wget -P dist/images http://joelgrus.com/experiments/pux-it/images/{0..56}.svg'"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "react": "^0.14.7",
-    "react-dom": "^0.14.7"
+    "create-react-class": "^15.6.0",
+    "react": "^15.6.0",
+    "react-dom": "^15.6.0"
   }
 }

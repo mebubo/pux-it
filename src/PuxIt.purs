@@ -1,21 +1,22 @@
 module PuxIt where
 
-import Control.Monad.Eff (Eff())
-import Control.Monad.Eff.Random (RANDOM(), random)
+import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Random (RANDOM, random)
 import Control.MonadPlus (guard)
-import Data.Array (length, zip, (..), replicateM, sortBy)
-import Data.Array.Unsafe (unsafeIndex, head)
-import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse)
+import Data.Array (head, length, replicate, sortBy, unsafeIndex, zip, (..))
+import Data.Foldable (sequence_)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.Traversable (sequence, traverse)
 import Data.Tuple (snd, Tuple(..), uncurry)
-import Prelude (class Show, bind, (&&), (||), show, (==), return, ($), map, const, (++), (-), (>>=), compare, otherwise)
-import Pux (EffModel())
-import Pux.Html (Html)
-import Pux.Html.Elements (img, div)
-import Pux.Html.Events (onClick)
-import Pux.Html.Attributes (src, className, alt)
-
+import Partial.Unsafe (unsafePartial)
+import Prelude (class Show, bind, (&&), (||), discard, show, (==), pure, ($), map, const, (<>), (-), (>>=), compare, otherwise)
+import Pux (EffModel)
+import Pux.DOM.Events (onClick)
+import Pux.DOM.HTML (HTML)
 import PuxIt.Math (createDeck)
+import Text.Smolder.HTML (img, div)
+import Text.Smolder.HTML.Attributes (src, className, alt)
+import Text.Smolder.Markup ((!), (#!))
 
 -- Type aliases for all of our primitives to make the code more readable.
 type Image     = Int          -- An image is just represented as an integer.
@@ -27,15 +28,15 @@ type CardIndex = Int          -- indexed by an integer.
 -- size `n` you'll have n^2 + n + 1 images, so you'll need that many image files.
 -- In our case we'll be using n = 7 => 57 images, like images/0.svg, etc...)
 imageUrl :: Image -> String
-imageUrl image = "images/" ++ show image ++ ".svg"
+imageUrl image = "images/" <> show image <> ".svg"
 
 -- And the only Action we have is clicking on a card. The Click action will
--- return the index of the clicked card.
+-- pure the index of the clicked card.
 data Action = Click CardIndex
 
 -- We don't really need this, but it's helpful for debugging.
 instance showAction :: Show Action where
-  show (Click i) = "Click " ++ show i
+  show (Click i) = "Click " <> show i
 
 -- You can select 0, 1, or 2 cards. We store their index[es].
 data SelectedCards = NoCards | OneCard CardIndex | TwoCards CardIndex CardIndex
@@ -49,8 +50,8 @@ type State = {
 -- Pair each element with a random, sort by the randoms, and then throw them away.
 shuffle :: forall e a. Array a -> Eff (random :: RANDOM | e) (Array a)
 shuffle xs = do
-  randoms <- replicateM (length xs) random
-  return $ map snd $ sortBy compareFst $ zip randoms xs
+  randoms <- sequence $ replicate (length xs) random
+  pure $ map snd $ sortBy compareFst $ zip randoms xs
   where compareFst (Tuple a _) (Tuple b _) = compare a b
 
 -- Create a random deck, by first shuffling the cards, then shuffling the
@@ -65,17 +66,17 @@ createRandomDeck n = shuffle (createDeck n) >>= traverse shuffle
 initialState :: forall e. Int -> Eff (random :: RANDOM | e) State
 initialState n = do
   cards <- createRandomDeck n
-  return { cards : cards, selected : NoCards }
+  pure { cards : cards, selected : NoCards }
 
 -- Finds the common image on cards[i] and cards[j]. Implicitly assumes that
 -- there is exactly one such image, which there will be if the deck is
 -- constructed correctly.
 commonImage :: Deck -> CardIndex -> CardIndex -> Image
-commonImage cards i j = head $ do
+commonImage cards i j = unsafePartial $ fromJust $ head $ do
   image1 <- cards `unsafeIndex` i
   image2 <- cards `unsafeIndex` j
   guard $ image1 == image2
-  return image1
+  pure image1
 
 -- Logic to update the state after the player clicks on a card. There's probably
 -- a cleaner way to write this. But the idea is that you can have 0, 1, or 2
@@ -102,8 +103,8 @@ mapWithIndex f xs = map (uncurry f) $ zip xs (0 .. (length xs - 1))
 
 -- The `view` is a `div` that contains the results of mapping `renderCard`
 -- over the cards and their indexes.
-view :: State -> Html Action
-view state = div [] cardsHtml
+view :: State -> HTML Action
+view state = div $ sequence_ cardsHtml
   where
     cardsHtml = mapWithIndex (renderCard state.selected correctImage) state.cards
     correctImage = case state.selected of
@@ -111,11 +112,11 @@ view state = div [] cardsHtml
       _            -> Nothing
 
 -- We render a card as a `div` that contains all of its rendered `images`.
--- We add a click handler that returns the card's index. And if the card is
+-- We add a click handler that pures the card's index. And if the card is
 -- selected, we add a "selected" class.
-renderCard :: SelectedCards -> Maybe Image -> Card -> CardIndex -> Html Action
+renderCard :: SelectedCards -> Maybe Image -> Card -> CardIndex -> HTML Action
 renderCard selectedCards correctImage card i =
-  div [ className cardClass, onClick cardClick ] cardHtml
+  (div ! className cardClass #! onClick cardClick) (sequence_ cardHtml)
   where
     isSelected = case selectedCards of
       NoCards        -> false
@@ -129,9 +130,9 @@ renderCard selectedCards correctImage card i =
 -- We render an image as just an `img` tag pointing to the relevant `src` url.
 -- If this image's card is selected, and if this is the correct image (based on
 -- two selected cards), we add a "correct" class to it.
-renderImage :: Boolean -> Maybe Image -> Image -> Html Action
+renderImage :: Boolean -> Maybe Image -> Image -> HTML Action
 renderImage isSelected correctImage image =
-  img [ src url, alt altText, className imageClass ]
+  img ! src url ! alt altText ! className imageClass
   where
     url = imageUrl image
     altText = show image
