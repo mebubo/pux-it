@@ -32,7 +32,7 @@ imageUrl :: Image -> String
 imageUrl image = "images/" <> show image <> ".svg"
 
 -- And the only Action we have is clicking on a card. The Click action will
--- pure the index of the clicked card.
+-- return the index of the clicked card.
 data Action = Click CardIndex
 
 -- We don't really need this, but it's helpful for debugging.
@@ -116,7 +116,7 @@ view state = div $ sequence_ cardsHtml
 -- selected, we add a "selected" class.
 renderCard :: SelectedCards -> Maybe Image -> Card -> CardIndex -> HTML Action
 renderCard selectedCards correctImage card i =
-  (div ! className cardClass #! onClick cardClick) (sequence_ cardHtml)
+  div ! className cardClass #! onClick cardClick $ sequence_ cardHtml
   where
     isSelected = case selectedCards of
       NoCards        -> false
