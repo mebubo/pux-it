@@ -5,9 +5,10 @@ import Control.Monad.Eff.Random (RANDOM, random)
 import Control.MonadPlus (guard)
 import Data.Array (head, length, replicate, sortBy, unsafeIndex, zip, (..))
 import Data.Foldable (sequence_)
+import Data.Function (on)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Traversable (sequence, traverse)
-import Data.Tuple (snd, Tuple(..), uncurry)
+import Data.Tuple (fst, snd, uncurry)
 import Partial.Unsafe (unsafePartial)
 import Prelude (class Show, bind, (&&), (||), discard, show, (==), pure, ($), map, const, (<>), (-), (>>=), compare, otherwise)
 import Pux (EffModel)
@@ -51,8 +52,7 @@ type State = {
 shuffle :: forall e a. Array a -> Eff (random :: RANDOM | e) (Array a)
 shuffle xs = do
   randoms <- sequence $ replicate (length xs) random
-  pure $ map snd $ sortBy compareFst $ zip randoms xs
-  where compareFst (Tuple a _) (Tuple b _) = compare a b
+  pure $ map snd $ sortBy (compare `on` fst) $ zip randoms xs
 
 -- Create a random deck, by first shuffling the cards, then shuffling the
 -- images on each card. Because `shuffle` is an effectful operation on each card
